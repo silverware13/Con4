@@ -36,11 +36,13 @@ void* customer_thread();
 void* barber_thread();
 void get_hair_cut();
 void cut_hair();
-void balk();
 int random_range(int min_val, int max_val);
 
 //create semaphore(s)
-sem_t waiting_mutex;
+sem_t waiting_chairs;
+sem_t sleeping_barber;
+sem_t barber_chair;
+sem_t barber_tools;
 
 int main(int argc, char **argv)
 {
@@ -58,8 +60,15 @@ int main(int argc, char **argv)
 
 	//define chairs	
 	int chairs;
-	chairs = strtol(argv[1], NULL, 10);	
+	chairs = strtol(argv[1], NULL, 10);
+	if(chairs < 0) chairs = 0; //no negative chairs.	
 	chairs_waiting = chairs - 1;
+
+	//initalize semaphore(s)
+	sem_init(&waiting_chairs, 0, 1);
+	sem_init(&sleeping_barber, 0, 1);
+	sem_init(&barber_chair, 0, 1);
+	sem_init(&barber_tools, 0, 1);
 
 	//seed random number generation
 	init_genrand(time(NULL));
@@ -69,7 +78,10 @@ int main(int argc, char **argv)
 	spawn_threads(chairs);
 	
 	//destroy semaphore(s)	
-	sem_destroy(&waiting_mutex);	
+	sem_destroy(&waiting_chairs);	
+	sem_destroy(&sleeping_barber);	
+	sem_destroy(&barber_chair);	
+	sem_destroy(&barber_tools);	
 	
 	return 0;
 }
@@ -85,11 +97,17 @@ void spawn_threads(int chairs)
 	pthread_t thrd;
 
 	printf("\nThe barber enters his barbershop.\n");
-	printf("Inside his shop is %d waiting chairs, and 1 barber chair.\n\n" chairs - 1);
 	
+	if(chairs){
+		printf("Inside his shop is %d waiting chairs, and 1 barber chair.\n\n", chairs - 1);
+	} else {
+		printf("Inside his shop there are no waiting chairs, and no barber chair.\n");
+		printf("How does he stay in business?\n\n");
+	}
+
 	//we have five more customer than possible chairs
 	int i;
-	for(i = chairs + 5; i > 0; i--){
+	for(i = chairs + 4; i > 0; i--){
 		pthread_create(&thrd, NULL, customer_thread, NULL);
 	}
 
@@ -110,11 +128,32 @@ void spawn_threads(int chairs)
  */
 void* barber_thread()
 {
-	printf("The barber has fallen asleep\n");
 	while(true){
-		//sleeps until customers show up.
-		//when awake, cuts a customers hair.
-		//when done looks for next customer to cut hair, if none exist sleep
+		sem_wait(&waiting_chairs);
+		if(!customers_waiting){
+			printf("The barber has fallen asleep\n");
+			sem_post(&waiting_chairs);
+			sem_wait(&sleeping_barber);
+			while(sem_trywait(&sleeping_barber) == -1){
+				sleep(1);	
+			}
+			printf("The barber has been woken up by a customer.\n");
+			sem_post(&sleeping_barber);
+			//give a haircut
+			wait(&barber_tools);
+			while(sem_trywait(&barber_chair) != -1){
+				sem_post(&barber_chair);
+			}
+			cut_hair();
+		} else {
+			sem_post(&waiting_chairs);
+			//give a haircut
+			wait(&barber_tools);
+			while(sem_trywait(&barber_chair) != -1){
+				sem_post(&barber_chair);
+			}
+			cut_hair();
+		}
 	}
 }
 
@@ -131,35 +170,58 @@ void* barber_thread()
 void* customer_thread()
 {
 	while(true){
-		sleep(random_range(1, 15);
+		sleep(random_range(1, 30));
 		printf("Customer entered barbershop.\n");
-		//enters barbershop, take a seat and wait
-		sem_wait(&waiting_mutex);
+		//if the barber is asleep the customer wakes him up
+		sem_post(&sleeping_barber);
+		//enters barbershop, take a seat and wait (or get a haircut if empty)
+		sem_wait(&waiting_chairs);
 		if(customers_waiting < chairs_waiting){
-			customer_waiting++;	
-			printf("Customer started waiting. %d of %d waiting chairs filled.\n", customer_waiting, chairs_waiting);
+			//if the barber is not busy try to get a haircut
+			if(sem_trywait(&barber_chair) == -1){
+				customers_waiting++;	
+				printf("Customer started waiting. %d of %d waiting chairs filled.\n", customers_waiting, chairs_waiting);
+				sem_post(&waiting_chairs);
+				sem_wait(&barber_chair)
+			} else {
+				//get a haircut
+				printf("Customer sat down in the barber chair");
+				sem_post(&waiting_chairs);
+				while(sem_trywait(&barber_tools) != -1){
+					sem_post(&barber_tools);
+				}
+				get_hair_cut();
+				continue;
+			}
 		} else {
 			printf("All waiting chairs are full. Customer left the barbershop.\n");
-			sem_post(&waiting_mutex);
+			sem_post(&waiting_chairs);
 			continue;	
 		}
-		sem_post(&waiting_mutex);
-		//if barbershop is full leaves.
-		//if chair is avaliable, but barber is busy. sits down
-		//if barber asleep, wakes barber
+		//get a haircut	
+		printf("Customer sat down in the barber chair");
+		sem_wait(&waiting_chairs);
+		customers_waiting--;	
+		sem_post(&waiting_chairs);
+		while(sem_trywait(&barber_tools) != -1){
+			sem_post(&barber_tools);
+		}
+		get_hair_cut();
 	}
 }
 
 void get_hair_cut()
 {
+	printf("A customer is getting their haircut.");
+	sleep(random_range(5));
+	printf("A customer finished getting their haircut and left the barbershop.");
 }
 
 void cut_hair()
 {
-}
-
-void balk()
-{
+	printf("The barber started cutting a customers hair.");
+	sleep(random_range(5));
+	printf("The barber finished cutting a customers hair.");
 }
 
 /* Function: random_range
