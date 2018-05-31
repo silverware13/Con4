@@ -1,18 +1,16 @@
-/* Concurrency 3
+/* Concurrency 4
  * CS444 Spring2018
  * ----------------
  * Name: Zachary Thomas
  * Email: thomasza@oregonstate.edu
- * Date: 5/11/2018
+ * Date: 5/30/2018
  * -------------------------------
- * Creates insert, search, and delete threads.
- * These threads interact with a linked list.
- * Inserters can only insert one at a time, but are okay with
- * searchers interacting with the list at the same time.
- * Searchers can interact with the list at the same time as other 
- * searchers.
- * Deleters must have sole access to the list. They do not allow
- * inserters or searchers.
+ * An agent and three smokers. The smokers loop
+ * forever, first waiting for ingredients, then
+ * making and smoking cigarettes. The ingredients
+ * are tobacco, paper, and matches. We assume that
+ * the agent has an infinite supply of all three ingredients,
+ * and each smoker has an infinite supply of one of the ingredients.
  */
 
 #include "mt19937ar.h"

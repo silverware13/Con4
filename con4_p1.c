@@ -1,15 +1,17 @@
-/* Concurrency 3
+/* Concurrency 4
  * CS444 Spring2018
  * ----------------
  * Name: Zachary Thomas
  * Email: thomasza@oregonstate.edu
- * Date: 5/11/2018
+ * Date: 5/30/2018
  * -------------------------------
- * There is a resource that may have up
- * to three threads use at the same time.
- * Once three threads are using it at the same
- * time, all three must leave before new
- * threads can use it.
+ * A barbershop consists of a waiting room with n chairs,
+ * and the barber room containing the barber chair. If there
+ * are no customers to be served, the barber goes to sleep. If
+ * a customer enters the barbershop and all chairs are occupied,
+ * then the customer leaves the shop. If the barber is busy, but
+ * chairs are available, then the customer sits in one of the free
+ * chairs. If the barber is asleep, the customer wakes up the barber
  */
 
 #define THREADS 6
