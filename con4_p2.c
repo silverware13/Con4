@@ -5,6 +5,8 @@
  * Email: thomasza@oregonstate.edu
  * Date: 5/30/2018
  * -------------------------------
+ * Cigarette smokers problem
+ *
  * An agent and three smokers. The smokers loop
  * forever, first waiting for ingredients, then
  * making and smoking cigarettes. The ingredients

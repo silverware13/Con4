@@ -5,6 +5,8 @@
  * Email: thomasza@oregonstate.edu
  * Date: 5/30/2018
  * -------------------------------
+ * The barbershop problem
+ *
  * A barbershop consists of a waiting room with n chairs,
  * and the barber room containing the barber chair. If there
  * are no customers to be served, the barber goes to sleep. If
@@ -14,7 +16,6 @@
  * chairs. If the barber is asleep, the customer wakes up the barber
  */
 
-#define THREADS 6
 #include "mt19937ar.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,36 +24,52 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <ctype.h>
-
-//linked list node
-typedef struct node{
-	int val;
-	struct node* next;
-} node;
+#include <semaphore.h>
 
 //global variable(s)
-int resource_users = 0;
-int resource_full = 0;
+int customers_waiting = 0;
+int chairs_waiting = 0;
 
 //function prototype(s)
-void spawn_threads();
-void* resource_thread();
+void spawn_threads(int chairs);
+void* customer_thread();
+void* barber_thread();
+void get_hair_cut();
+void cut_hair();
+void balk();
 int random_range(int min_val, int max_val);
 
-//create mutex lock(s)
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+//create semaphore(s)
+sem_t waiting_mutex;
 
 int main(int argc, char **argv)
 {
+	//user must enter correct number of args
+	if(argc < 2 || argc > 2){
+		printf("USEAGE: %s [number of chairs]\n", argv[0]);
+		return 0;
+	}
+
+	//user must enter number of chairs as an unisgned int
+	if(!isdigit(*argv[1])){
+		printf("Please enter argument as unsigned integer.\n");
+		return 0;
+	}
+
+	//define chairs	
+	int chairs;
+	chairs = strtol(argv[1], NULL, 10);	
+	chairs_waiting = chairs - 1;
+
 	//seed random number generation
 	init_genrand(time(NULL));
 	srand(time(NULL));	
 	
 	//create threads and wait for their completion
-	spawn_threads();
+	spawn_threads(chairs);
 	
-	//destroy mutex lock(s)	
-	pthread_mutex_destroy(&lock);
+	//destroy semaphore(s)	
+	sem_destroy(&waiting_mutex);	
 	
 	return 0;
 }
@@ -63,64 +80,86 @@ int main(int argc, char **argv)
  * finish execution and join. Since these threads will run forever, we expect
  * to block here indefinitely.
  */
-void spawn_threads()
+void spawn_threads(int chairs)
 {
 	pthread_t thrd;
 
-	printf("\nCreating resource threads.\n\n");
+	printf("\nThe barber enters his barbershop.\n");
+	printf("Inside his shop is %d waiting chairs, and 1 barber chair.\n\n" chairs - 1);
 	
+	//we have five more customer than possible chairs
 	int i;
-	for(i = THREADS; i > 0; i--){
-		pthread_create(&thrd, NULL, resource_thread, NULL);
+	for(i = chairs + 5; i > 0; i--){
+		pthread_create(&thrd, NULL, customer_thread, NULL);
 	}
+
+	//we create the barber	
+	pthread_create(&thrd, NULL, barber_thread, NULL);	
 
 	//join thread (this should never finish)
 	pthread_join(thrd, NULL);
 }
 
-/* Function: resource_thread
+/* Function: barber_thread
  * -------------------------
  * This function is called by a new resource thread when it is created.
  *
- * This thread thinks about using a resource for 1-3 seconds.
- * Then it will access the resource if there are less than 3 users,
- * but only if there wasn't previously 3 users, if there were this thread
- * waits until there are zero.
- * Next it uses the resource for 0-2 seconds.
- * Lastly it leaves the resource.
+ * Sleeps until customers show up.
+ * When awake, cuts a customers hair.
+ * When done looks for next customer to cut hair, if none exist sleep.
  */
-void* resource_thread()
+void* barber_thread()
+{
+	printf("The barber has fallen asleep\n");
+	while(true){
+		//sleeps until customers show up.
+		//when awake, cuts a customers hair.
+		//when done looks for next customer to cut hair, if none exist sleep
+	}
+}
+
+/* Function: customer_thread
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * Waits a random amount of time.
+ * Enters barbershop.
+ * If barbershop is full leaves.
+ * If chair is avaliable, but barber is busy. sits down.
+ * If barber asleep, wakes barber
+ */
+void* customer_thread()
 {
 	while(true){
-		//think about using the resource
-		sleep(random_range(1, 3));
-		
-		//access the resource
-		pthread_mutex_lock(&lock);
-		if(resource_users < 3 && !resource_full){
-			resource_users++;
-			if(resource_users == 3){
-				resource_full = 1;
-			}
-			printf("A process has started using the resource.\nRESOURCE USERS = %d\n", resource_users); 
+		sleep(random_range(1, 15);
+		printf("Customer entered barbershop.\n");
+		//enters barbershop, take a seat and wait
+		sem_wait(&waiting_mutex);
+		if(customers_waiting < chairs_waiting){
+			customer_waiting++;	
+			printf("Customer started waiting. %d of %d waiting chairs filled.\n", customer_waiting, chairs_waiting);
 		} else {
-			pthread_mutex_unlock(&lock);
-			continue;
+			printf("All waiting chairs are full. Customer left the barbershop.\n");
+			sem_post(&waiting_mutex);
+			continue;	
 		}
-		pthread_mutex_unlock(&lock);
-		
-		//use the resource
-		sleep(random_range(0,2));
-		
-		//leave the resource
-		pthread_mutex_lock(&lock);
-		resource_users--;
-		if(resource_users == 0){
-			resource_full = 0;
-		}
-		printf("A process has finished using the resource.\nRESOURCE USERS = %d\n", resource_users); 
-		pthread_mutex_unlock(&lock);
+		sem_post(&waiting_mutex);
+		//if barbershop is full leaves.
+		//if chair is avaliable, but barber is busy. sits down
+		//if barber asleep, wakes barber
 	}
+}
+
+void get_hair_cut()
+{
+}
+
+void cut_hair()
+{
+}
+
+void balk()
+{
 }
 
 /* Function: random_range
