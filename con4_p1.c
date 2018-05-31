@@ -99,13 +99,13 @@ void spawn_threads(int chairs)
 {
 	pthread_t thrd;
 
-	printf("\nThe barber enters his barbershop.\n");
+	printf(ANSI_COLOR_CYAN "\nThe barber enters his barbershop." ANSI_COLOR_RESET "\n");
 	
 	if(chairs){
-		printf("Inside his shop is %d waiting chairs, and 1 barber chair.\n\n", chairs - 1);
+		printf(ANSI_COLOR_CYAN "Inside his shop is %d waiting chairs, and 1 barber chair." ANSI_COLOR_RESET "\n\n", chairs - 1);
 	} else {
-		printf("Inside his shop there are no waiting chairs, and no barber chair.\n");
-		printf("How does he stay in business?\n\n");
+		printf(ANSI_COLOR_CYAN "Inside his shop there are no waiting chairs, and no barber chair." ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_CYAN "How does he stay in business?" ANSI_COLOR_RESET "\n\n");
 	}
 
 	//we have five more customer than possible chairs
