@@ -231,6 +231,12 @@ void* customer_thread()
 	}
 }
 
+/* Function: get_hair_cut
+ * ----------------------
+ * Customer gets a haircut for
+ * five seconds. Then leaves the
+ * barber chair.
+ */
 void get_hair_cut()
 {
 	printf(ANSI_COLOR_YELLOW "A customer is getting their haircut." ANSI_COLOR_RESET "\n");
@@ -239,6 +245,12 @@ void get_hair_cut()
 	sem_post(&barber_chair);
 }
 
+/* Function: cut_hair
+ * ----------------------
+ * Barber cuts hair for
+ * five seconds. Then takes
+ * one second to set down tools.
+ */
 void cut_hair()
 {
 	printf(ANSI_COLOR_CYAN "The barber started cutting a customers hair." ANSI_COLOR_RESET "\n");
