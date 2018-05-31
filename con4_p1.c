@@ -65,7 +65,6 @@ int main(int argc, char **argv)
 	//define chairs	
 	int chairs;
 	chairs = strtol(argv[1], NULL, 10);
-	if(chairs < 0) chairs = 0; //no negative chairs.	
 	chairs_waiting = chairs - 1;
 
 	//initalize semaphore(s)
