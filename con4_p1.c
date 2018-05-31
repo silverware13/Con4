@@ -16,6 +16,10 @@
  * chairs. If the barber is asleep, the customer wakes up the barber
  */
 
+#define ANSI_COLOR_CYAN     "\x1b[36m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 #include "mt19937ar.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,18 +133,29 @@ void spawn_threads(int chairs)
 void* barber_thread()
 {
 	while(true){
+		if(sem_trywait(&barber_chair) != -1){
+			sem_post(&barber_chair);
+		} else {
+			//give a haircut
+			sem_wait(&barber_tools);
+			while(sem_trywait(&barber_chair) != -1){
+				sem_post(&barber_chair);
+			}
+			cut_hair();
+			continue;
+		}
 		sem_wait(&waiting_chairs);
 		if(!customers_waiting){
-			printf("The barber has fallen asleep\n");
+			printf(ANSI_COLOR_CYAN "The barber has fallen asleep." ANSI_COLOR_RESET "\n");
 			sem_post(&waiting_chairs);
 			sem_wait(&sleeping_barber);
 			while(sem_trywait(&sleeping_barber) == -1){
 				sleep(1);	
 			}
-			printf("The barber has been woken up by a customer.\n");
+			printf(ANSI_COLOR_CYAN "The barber has been woken up by a customer." ANSI_COLOR_RESET "\n");
 			sem_post(&sleeping_barber);
 			//give a haircut
-			wait(&barber_tools);
+			sem_wait(&barber_tools);
 			while(sem_trywait(&barber_chair) != -1){
 				sem_post(&barber_chair);
 			}
@@ -148,7 +163,7 @@ void* barber_thread()
 		} else {
 			sem_post(&waiting_chairs);
 			//give a haircut
-			wait(&barber_tools);
+			sem_wait(&barber_tools);
 			while(sem_trywait(&barber_chair) != -1){
 				sem_post(&barber_chair);
 			}
@@ -170,8 +185,8 @@ void* barber_thread()
 void* customer_thread()
 {
 	while(true){
-		sleep(random_range(1, 30));
-		printf("Customer entered barbershop.\n");
+		sleep(random_range(3, 30));
+		printf(ANSI_COLOR_YELLOW "Customer entered barbershop." ANSI_COLOR_RESET "\n");
 		//if the barber is asleep the customer wakes him up
 		sem_post(&sleeping_barber);
 		//enters barbershop, take a seat and wait (or get a haircut if empty)
@@ -180,12 +195,12 @@ void* customer_thread()
 			//if the barber is not busy try to get a haircut
 			if(sem_trywait(&barber_chair) == -1){
 				customers_waiting++;	
-				printf("Customer started waiting. %d of %d waiting chairs filled.\n", customers_waiting, chairs_waiting);
+				printf(ANSI_COLOR_YELLOW "Customer started waiting. %d of %d waiting chairs filled." ANSI_COLOR_RESET "\n", customers_waiting, chairs_waiting);
 				sem_post(&waiting_chairs);
-				sem_wait(&barber_chair)
+				sem_wait(&barber_chair);
 			} else {
 				//get a haircut
-				printf("Customer sat down in the barber chair");
+				printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
 				sem_post(&waiting_chairs);
 				while(sem_trywait(&barber_tools) != -1){
 					sem_post(&barber_tools);
@@ -194,12 +209,12 @@ void* customer_thread()
 				continue;
 			}
 		} else {
-			printf("All waiting chairs are full. Customer left the barbershop.\n");
+			printf(ANSI_COLOR_YELLOW "All waiting chairs are full. Customer left the barbershop." ANSI_COLOR_RESET "\n");
 			sem_post(&waiting_chairs);
 			continue;	
 		}
 		//get a haircut	
-		printf("Customer sat down in the barber chair");
+		printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
 		sem_wait(&waiting_chairs);
 		customers_waiting--;	
 		sem_post(&waiting_chairs);
@@ -212,16 +227,19 @@ void* customer_thread()
 
 void get_hair_cut()
 {
-	printf("A customer is getting their haircut.");
-	sleep(random_range(5));
-	printf("A customer finished getting their haircut and left the barbershop.");
+	printf(ANSI_COLOR_YELLOW "A customer is getting their haircut." ANSI_COLOR_RESET "\n");
+	sleep(5);
+	printf(ANSI_COLOR_YELLOW "A customer finished getting their haircut and left the barbershop." ANSI_COLOR_RESET"\n");
+	sem_post(&barber_chair);
 }
 
 void cut_hair()
 {
-	printf("The barber started cutting a customers hair.");
-	sleep(random_range(5));
-	printf("The barber finished cutting a customers hair.");
+	printf(ANSI_COLOR_CYAN "The barber started cutting a customers hair." ANSI_COLOR_RESET "\n");
+	sleep(5);
+	printf(ANSI_COLOR_CYAN "The barber finished cutting a customers hair." ANSI_COLOR_RESET "\n");
+	sem_post(&barber_tools);
+	sleep(1);
 }
 
 /* Function: random_range
