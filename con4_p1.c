@@ -188,39 +188,46 @@ void* customer_thread()
 		printf(ANSI_COLOR_YELLOW "Customer entered barbershop." ANSI_COLOR_RESET "\n");
 		//if the barber is asleep the customer wakes him up
 		sem_post(&sleeping_barber);
-		//enters barbershop, take a seat and wait (or get a haircut if empty)
-		sem_wait(&waiting_chairs);
-		if(customers_waiting < chairs_waiting){
-			//if the barber is not busy try to get a haircut
-			if(sem_trywait(&barber_chair) == -1){
-				customers_waiting++;	
-				printf(ANSI_COLOR_YELLOW "Customer started waiting. %d of %d waiting chairs filled." ANSI_COLOR_RESET "\n", customers_waiting, chairs_waiting);
-				sem_post(&waiting_chairs);
-				sem_wait(&barber_chair);
-			} else {
+		//if there are no chairs just leave
+		if(chairs_waiting == -1){
+			printf(ANSI_COLOR_YELLOW "There aren't any chairs in this barbershop. Customer left the barbershop." ANSI_COLOR_RESET "\n");
+			continue;
+		}
+		//if the barber chair is empty sit in it
+		if(sem_trywait(&barber_chair) != -1){
 				//get a haircut
 				printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
-				sem_post(&waiting_chairs);
 				while(sem_trywait(&barber_tools) != -1){
 					sem_post(&barber_tools);
 				}
 				get_hair_cut();
 				continue;
+		}
+		//if a waiting chair is empty sit in it
+		sem_wait(&waiting_chairs);
+		if(customers_waiting < chairs_waiting){
+			//we wait in a chair to get a haircut
+			customers_waiting++;	
+			printf(ANSI_COLOR_YELLOW "Customer started waiting. %d of %d waiting chairs filled." 
+				ANSI_COLOR_RESET "\n", customers_waiting, chairs_waiting);
+			sem_post(&waiting_chairs);
+			sem_wait(&barber_chair);
+			//get a haircut	
+			printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
+			sem_wait(&waiting_chairs);
+			customers_waiting--;	
+			sem_post(&waiting_chairs);
+			while(sem_trywait(&barber_tools) != -1){
+				sem_post(&barber_tools);
 			}
+			get_hair_cut();
+			continue;
 		} else {
+			//we leave, no chairs to wait in
 			printf(ANSI_COLOR_YELLOW "All waiting chairs are full. Customer left the barbershop." ANSI_COLOR_RESET "\n");
 			sem_post(&waiting_chairs);
 			continue;	
 		}
-		//get a haircut	
-		printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
-		sem_wait(&waiting_chairs);
-		customers_waiting--;	
-		sem_post(&waiting_chairs);
-		while(sem_trywait(&barber_tools) != -1){
-			sem_post(&barber_tools);
-		}
-		get_hair_cut();
 	}
 }
 
