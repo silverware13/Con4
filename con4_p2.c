@@ -13,8 +13,14 @@
  * are tobacco, paper, and matches. We assume that
  * the agent has an infinite supply of all three ingredients,
  * and each smoker has an infinite supply of one of the ingredients.
+ * the agent hands out two ingredients and waits for smokers
+ * with the third ingredient to collect.
  */
 
+#define PAPER 1
+#define MATCHES 2
+#define TOBACCO 3
+#define NUM_SMOKERS 3
 #define ANSI_COLOR_CYAN     "\x1b[36m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
@@ -29,61 +35,37 @@
 #include <ctype.h>
 #include <semaphore.h>
 
-//global variable(s)
-int customers_waiting = 0;
-int chairs_waiting = 0;
-
 //function prototype(s)
-void spawn_threads(int chairs);
-void* customer_thread();
-void* agent_thread();
-void get_hair_cut();
-void cut_hair();
+void spawn_threads();
+void* smoker_thread();
+void* agent_thread_A();
+void* agent_thread_B();
+void* agent_thread_C();
 int random_range(int min_val, int max_val);
 
 //create semaphore(s)
-sem_t waiting_chairs;
-sem_t sleeping_agent;
-sem_t agent_chair;
-sem_t agent_tools;
+sem_t paper;
+sem_t tobacco;
+sem_t matches;
 
 int main(int argc, char **argv)
 {
-	//user must enter correct number of args
-	if(argc < 2 || argc > 2){
-		printf("USEAGE: %s [number of chairs]\n", argv[0]);
-		return 0;
-	}
-
-	//user must enter number of chairs as an unisgned int
-	if(!isdigit(*argv[1])){
-		printf("Please enter argument as unsigned integer.\n");
-		return 0;
-	}
-
-	//define chairs	
-	int chairs;
-	chairs = strtol(argv[1], NULL, 10);
-	chairs_waiting = chairs - 1;
-
 	//initalize semaphore(s)
-	sem_init(&waiting_chairs, 0, 1);
-	sem_init(&sleeping_agent, 0, 1);
-	sem_init(&agent_chair, 0, 1);
-	sem_init(&agent_tools, 0, 1);
+	sem_init(&paper, 0, 1);
+	sem_init(&tobacco, 0, 1);
+	sem_init(&matches, 0, 1);
 
 	//seed random number generation
 	init_genrand(time(NULL));
 	srand(time(NULL));	
 	
 	//create threads and wait for their completion
-	spawn_threads(chairs);
+	spawn_threads();
 	
 	//destroy semaphore(s)	
-	sem_destroy(&waiting_chairs);	
-	sem_destroy(&sleeping_agent);	
-	sem_destroy(&agent_chair);	
-	sem_destroy(&agent_tools);	
+	sem_destroy(&paper);	
+	sem_destroy(&tobacco);	
+	sem_destroy(&matches);	
 	
 	return 0;
 }
@@ -94,98 +76,68 @@ int main(int argc, char **argv)
  * finish execution and join. Since these threads will run forever, we expect
  * to block here indefinitely.
  */
-void spawn_threads(int chairs)
+void spawn_threads()
 {
 	pthread_t thrd;
 
-	printf(ANSI_COLOR_CYAN "\nThe agent enters his barbershop." ANSI_COLOR_RESET "\n");
+	printf(ANSI_COLOR_CYAN "\n There is 1 agent and 3 smokers." ANSI_COLOR_RESET "\n\n");
 	
-	if(chairs){
-		printf(ANSI_COLOR_CYAN "Inside his shop is %d waiting chairs, and 1 agent chair." ANSI_COLOR_RESET "\n\n", chairs - 1);
-	} else {
-		printf(ANSI_COLOR_CYAN "Inside his shop there are no waiting chairs, and no agent chair." ANSI_COLOR_RESET "\n");
-		printf(ANSI_COLOR_CYAN "How does he stay in business?" ANSI_COLOR_RESET "\n\n");
-	}
-
-	//we have five more customer than possible chairs
-	int i;
-	for(i = chairs + 4; i > 0; i--){
-		pthread_create(&thrd, NULL, customer_thread, NULL);
+	for(i = NUM_SMOKERS; i > 0; i--){
+		pthread_create(&thrd, NULL, smoker_thread, NULL);
 	}
 
 	//we create the agent	
-	pthread_create(&thrd, NULL, agent_thread, NULL);	
+	pthread_create(&thrd, NULL, agent_thread_A, NULL);	
+	pthread_create(&thrd, NULL, agent_thread_B, NULL);	
+	pthread_create(&thrd, NULL, agent_thread_C, NULL);	
 
 	//join thread (this should never finish)
 	pthread_join(thrd, NULL);
 }
 
-/* Function: agent_thread
+/* Function: agent_thread_A
  * -------------------------
  * This function is called by a new resource thread when it is created.
- *
- * Sleeps until customers show up.
- * When awake, cuts a customers hair.
- * When done looks for next customer to cut hair, if none exist sleep.
  */
-void* agent_thread()
+void* agent_thread_A()
 {
 	while(true){
-		if(sem_trywait(&agent_chair) != -1){
-			sem_post(&agent_chair);
-		} else {
-			//give a haircut
-			sem_wait(&agent_tools);
-			while(sem_trywait(&agent_chair) != -1){
-				sem_post(&agent_chair);
-			}
-			cut_hair();
-			continue;
-		}
-		sem_wait(&waiting_chairs);
-		if(!customers_waiting){
-			printf(ANSI_COLOR_CYAN "The agent has fallen asleep." ANSI_COLOR_RESET "\n");
-			sem_post(&waiting_chairs);
-			sem_wait(&sleeping_agent);
-			while(sem_trywait(&sleeping_agent) == -1){
-				sleep(1);	
-			}
-			printf(ANSI_COLOR_CYAN "The agent has been woken up by a customer." ANSI_COLOR_RESET "\n");
-			sem_post(&sleeping_agent);
-			//give a haircut
-			sem_wait(&agent_tools);
-			while(sem_trywait(&agent_chair) != -1){
-				sem_post(&agent_chair);
-			}
-			cut_hair();
-		} else {
-			sem_post(&waiting_chairs);
-			//give a haircut
-			sem_wait(&agent_tools);
-			while(sem_trywait(&agent_chair) != -1){
-				sem_post(&agent_chair);
-			}
-			cut_hair();
-		}
+			
 	}
 }
 
-/* Function: customer_thread
+/* Function: agent_thread_B
  * -------------------------
  * This function is called by a new resource thread when it is created.
- *
- * Waits a random amount of time.
- * Enters agentshop.
- * If agentshop is full leaves.
- * If chair is avaliable, but agent is busy. sits down.
- * If agent asleep, wakes barber
  */
-void* customer_thread()
+void* agent_thread_B()
+{
+	while(true){
+			
+	}
+}
+
+/* Function: agent_thread_C
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ */
+void* agent_thread_C()
+{
+	while(true){
+			
+	}
+}
+
+/* Function: smoker_thread
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ */
+void* smoker_thread()
 {
 	while(true){
 		sleep(random_range(3, 30));
 		printf(ANSI_COLOR_YELLOW "Customer entered agentshop." ANSI_COLOR_RESET "\n");
-		//if the agent is asleep the customer wakes him up
+		//if the agent is asleep the smoker wakes him up
 		sem_post(&sleeping_agent);
 		//if there are no chairs just leave
 		if(chairs_waiting == -1){
@@ -204,17 +156,17 @@ void* customer_thread()
 		}
 		//if a waiting chair is empty sit in it
 		sem_wait(&waiting_chairs);
-		if(customers_waiting < chairs_waiting){
+		if(smokers_waiting < chairs_waiting){
 			//we wait in a chair to get a haircut
-			customers_waiting++;	
+			smokers_waiting++;	
 			printf(ANSI_COLOR_YELLOW "Customer started waiting. %d of %d waiting chairs filled." 
-				ANSI_COLOR_RESET "\n", customers_waiting, chairs_waiting);
+				ANSI_COLOR_RESET "\n", smokers_waiting, chairs_waiting);
 			sem_post(&waiting_chairs);
 			sem_wait(&agent_chair);
 			//get a haircut	
 			printf(ANSI_COLOR_YELLOW "Customer sat down in the agent chair." ANSI_COLOR_RESET "\n");
 			sem_wait(&waiting_chairs);
-			customers_waiting--;	
+			smokers_waiting--;	
 			sem_post(&waiting_chairs);
 			while(sem_trywait(&agent_tools) != -1){
 				sem_post(&agent_tools);
@@ -228,23 +180,6 @@ void* customer_thread()
 			continue;	
 		}
 	}
-}
-
-void get_hair_cut()
-{
-	printf(ANSI_COLOR_YELLOW "A customer is getting their haircut." ANSI_COLOR_RESET "\n");
-	sleep(5);
-	printf(ANSI_COLOR_YELLOW "A customer finished getting their haircut and left the agentshop." ANSI_COLOR_RESET"\n");
-	sem_post(&agent_chair);
-}
-
-void cut_hair()
-{
-	printf(ANSI_COLOR_CYAN "The agent started cutting a customers hair." ANSI_COLOR_RESET "\n");
-	sleep(5);
-	printf(ANSI_COLOR_CYAN "The agent finished cutting a customers hair." ANSI_COLOR_RESET "\n");
-	sem_post(&agent_tools);
-	sleep(1);
 }
 
 /* Function: random_range

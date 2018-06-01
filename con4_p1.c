@@ -94,6 +94,8 @@ int main(int argc, char **argv)
  * Spawns threads then waits for threads to
  * finish execution and join. Since these threads will run forever, we expect
  * to block here indefinitely.
+ *
+ * chairs: the number of chairs in the barbershop
  */
 void spawn_threads(int chairs)
 {
@@ -108,7 +110,7 @@ void spawn_threads(int chairs)
 		printf(ANSI_COLOR_CYAN "How does he stay in business?" ANSI_COLOR_RESET "\n\n");
 	}
 
-	//we have five more customer than possible chairs
+	//we have four more customer than possible chairs
 	int i;
 	for(i = chairs + 4; i > 0; i--){
 		pthread_create(&thrd, NULL, customer_thread, NULL);
