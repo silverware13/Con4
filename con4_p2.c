@@ -15,14 +15,14 @@
  * and each smoker has an infinite supply of one of the ingredients.
  * the agent hands out two ingredients and waits for smokers
  * with the third ingredient to collect.
+ * -------------------------------------
+ * Cite refrence:
+ * Little book of semaphores. Chapter 4.5
  */
 
-#define PAPER 1
-#define MATCHES 2
-#define TOBACCO 3
-#define NUM_SMOKERS 3
-#define ANSI_COLOR_CYAN     "\x1b[36m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 #include "mt19937ar.h"
@@ -35,26 +35,46 @@
 #include <ctype.h>
 #include <semaphore.h>
 
+//global variable(s)
+bool hand_tobacco = 0;
+bool hand_paper = 0;
+bool hand_match = 0;
+
 //function prototype(s)
 void spawn_threads();
-void* smoker_thread();
+void* smoker_thread_matches();
+void* smoker_thread_tobacco();
+void* smoker_thread_paper();
 void* agent_thread_A();
 void* agent_thread_B();
 void* agent_thread_C();
+void* pusher_thread_A();
+void* pusher_thread_B();
+void* pusher_thread_C();
 int random_range(int min_val, int max_val);
 
 //create semaphore(s)
+sem_t agent_sem;
+sem_t pusher_sem;
 sem_t paper;
 sem_t tobacco;
 sem_t matches;
+sem_t mutex_paper;
+sem_t mutex_tobacco;
+sem_t mutex_matches;
 
 int main(int argc, char **argv)
 {
 	//initalize semaphore(s)
-	sem_init(&paper, 0, 1);
-	sem_init(&tobacco, 0, 1);
-	sem_init(&matches, 0, 1);
-
+	sem_init(&agent_sem, 0, 1);
+	sem_init(&pusher_sem, 0, 1);
+	sem_init(&paper, 0, 0);
+	sem_init(&tobacco, 0, 0);
+	sem_init(&matches, 0, 0);
+	sem_init(&mutex_paper, 0, 0);
+	sem_init(&mutex_tobacco, 0, 0);
+	sem_init(&mutex_matches, 0, 0);
+	
 	//seed random number generation
 	init_genrand(time(NULL));
 	srand(time(NULL));	
@@ -63,9 +83,14 @@ int main(int argc, char **argv)
 	spawn_threads();
 	
 	//destroy semaphore(s)	
+	sem_destroy(&agent_sem);	
+	sem_destroy(&pusher_sem);	
 	sem_destroy(&paper);	
 	sem_destroy(&tobacco);	
 	sem_destroy(&matches);	
+	sem_destroy(&mutex_paper);	
+	sem_destroy(&mutex_tobacco);	
+	sem_destroy(&mutex_matches);	
 	
 	return 0;
 }
@@ -80,11 +105,17 @@ void spawn_threads()
 {
 	pthread_t thrd;
 
-	printf(ANSI_COLOR_CYAN "\n There is 1 agent and 3 smokers." ANSI_COLOR_RESET "\n\n");
+	printf(ANSI_COLOR_MAGENTA "\n There is 1 agent and 3 smokers." ANSI_COLOR_RESET "\n\n");
 	
-	for(i = NUM_SMOKERS; i > 0; i--){
-		pthread_create(&thrd, NULL, smoker_thread, NULL);
-	}
+	//we create three smokers
+	pthread_create(&thrd, NULL, smoker_thread_matches, NULL);	
+	pthread_create(&thrd, NULL, smoker_thread_tobacco, NULL);	
+	pthread_create(&thrd, NULL, smoker_thread_paper, NULL);	
+	
+	//we create three pushers	
+	pthread_create(&thrd, NULL, pusher_thread_A, NULL);	
+	pthread_create(&thrd, NULL, pusher_thread_B, NULL);	
+	pthread_create(&thrd, NULL, pusher_thread_C, NULL);	
 
 	//we create the agent	
 	pthread_create(&thrd, NULL, agent_thread_A, NULL);	
@@ -98,87 +129,192 @@ void spawn_threads()
 /* Function: agent_thread_A
  * -------------------------
  * This function is called by a new resource thread when it is created.
+ *
+ * This thread acts as the agent handing out tobacco and paper.
  */
 void* agent_thread_A()
 {
 	while(true){
-			
+		sem_wait(&agent_sem);
+		printf(ANSI_COLOR_CYAN "\n The agent holds out tobacco and paper." 
+			ANSI_COLOR_RESET "\n");
+		hand_tobacco = 1;
+		hand_paper = 1;
+		hand_match = 0;
+		sem_post(&tobacco);
+		sem_post(&paper);
 	}
 }
 
 /* Function: agent_thread_B
  * -------------------------
  * This function is called by a new resource thread when it is created.
+ *
+ * This thread acts as the agent handing out matches and paper.
  */
 void* agent_thread_B()
 {
 	while(true){
-			
+		sem_wait(&agent_sem);
+		printf(ANSI_COLOR_CYAN "\n The agent holds out matches and paper." 
+			ANSI_COLOR_RESET "\n");
+		hand_tobacco = 0;
+		hand_paper = 1;
+		hand_match = 1;
+		sem_post(&matches);
+		sem_post(&paper);
 	}
 }
 
 /* Function: agent_thread_C
  * -------------------------
  * This function is called by a new resource thread when it is created.
+ *
+ * This thread acts as the agent handing out matches and tobacco.
  */
 void* agent_thread_C()
 {
 	while(true){
-			
+		sem_wait(&agent_sem);
+		printf(ANSI_COLOR_CYAN "\n The agent holds out matches and tobacco." 
+			ANSI_COLOR_RESET "\n");
+		hand_tobacco = 1;
+		hand_paper = 0;
+		hand_match = 1;
+		sem_post(&matches);
+		sem_post(&tobacco);
 	}
 }
 
-/* Function: smoker_thread
+/* Function: smoker_thread_matches
  * -------------------------
  * This function is called by a new resource thread when it is created.
+ *
+ * This smoker has matches. 
  */
-void* smoker_thread()
+void* smoker_thread_matches()
 {
 	while(true){
-		sleep(random_range(3, 30));
-		printf(ANSI_COLOR_YELLOW "Customer entered agentshop." ANSI_COLOR_RESET "\n");
-		//if the agent is asleep the smoker wakes him up
-		sem_post(&sleeping_agent);
-		//if there are no chairs just leave
-		if(chairs_waiting == -1){
-			printf(ANSI_COLOR_YELLOW "There aren't any chairs in this agentshop. Customer left the barbershop." ANSI_COLOR_RESET "\n");
-			continue;
-		}
-		//if the agent chair is empty sit in it
-		if(sem_trywait(&agent_chair) != -1){
-				//get a haircut
-				printf(ANSI_COLOR_YELLOW "Customer sat down in the agent chair." ANSI_COLOR_RESET "\n");
-				while(sem_trywait(&agent_tools) != -1){
-					sem_post(&agent_tools);
-				}
-				get_hair_cut();
-				continue;
-		}
-		//if a waiting chair is empty sit in it
-		sem_wait(&waiting_chairs);
-		if(smokers_waiting < chairs_waiting){
-			//we wait in a chair to get a haircut
-			smokers_waiting++;	
-			printf(ANSI_COLOR_YELLOW "Customer started waiting. %d of %d waiting chairs filled." 
-				ANSI_COLOR_RESET "\n", smokers_waiting, chairs_waiting);
-			sem_post(&waiting_chairs);
-			sem_wait(&agent_chair);
-			//get a haircut	
-			printf(ANSI_COLOR_YELLOW "Customer sat down in the agent chair." ANSI_COLOR_RESET "\n");
-			sem_wait(&waiting_chairs);
-			smokers_waiting--;	
-			sem_post(&waiting_chairs);
-			while(sem_trywait(&agent_tools) != -1){
-				sem_post(&agent_tools);
-			}
-			get_hair_cut();
-			continue;
+		sem_wait(&mutex_matches);
+		printf(ANSI_COLOR_YELLOW "\n The smoker takes the tobacco and paper." 
+			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sem_post(&agent_sem);
+		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+	}
+}
+
+/* Function: smoker_thread_tobacco
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * This smoker has tobacco. 
+ */
+void* smoker_thread_tobacco()
+{
+	while(true){
+		sem_wait(&mutex_tobacco);
+		printf(ANSI_COLOR_YELLOW "\n The smoker takes the matches and paper." 
+			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sem_post(&agent_sem);
+		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+	}
+}
+
+/* Function: smoker_thread_paper
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * This smoker has paper. 
+ */
+void* smoker_thread_paper()
+{
+	while(true){
+		sem_wait(&mutex_paper);
+		printf(ANSI_COLOR_YELLOW "\n The smoker takes the matches and tobacco." 
+			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sem_post(&agent_sem);
+		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+	}
+}
+
+/* Function: pusher_thread_A
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * This pusher finds a smoker without tobacco. 
+ */
+void* pusher_thread_A()
+{
+	while(true){
+		sem_wait(&tobacco);
+		sem_wait(&pusher_sem);
+		if(hand_paper){
+			hand_paper = 0;
+			sem_post(smoker_thread_matches);
+		} else if(hand_match){
+			hand_match = 0;
+			sem_post(smoker_thread_paper);
 		} else {
-			//we leave, no chairs to wait in
-			printf(ANSI_COLOR_YELLOW "All waiting chairs are full. Customer left the agentshop." ANSI_COLOR_RESET "\n");
-			sem_post(&waiting_chairs);
-			continue;	
+			hand_tobacco = 1;
 		}
+		sem_post(&pusher_sem);
+	}
+}
+
+/* Function: pusher_thread_B
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * This pusher finds a smoker without matches. 
+ */
+void* pusher_thread_B()
+{
+	while(true){
+		sem_wait(&matches);
+		sem_wait(&pusher_sem);
+		if(hand_paper){
+			hand_paper = 0;
+			sem_post(smoker_thread_tobacco);
+		} else if(hand_tobacco){
+			hand_tobacco = 0;
+			sem_post(smoker_thread_paper);
+		} else {
+			hand_matches = 1;
+		}
+		sem_post(&pusher_sem);
+	}
+}
+
+/* Function: pusher_thread_C
+ * -------------------------
+ * This function is called by a new resource thread when it is created.
+ *
+ * This pusher finds a smoker without paper. 
+ */
+void* pusher_thread_C()
+{
+	while(true){
+		sem_wait(&paper);
+		sem_wait(&pusher_sem);
+		if(hand_matches){
+			hand_matches = 0;
+			sem_post(smoker_thread_tobacco);
+		} else if(hand_tobacco){
+			hand_tobacco = 0;
+			sem_post(smoker_thread_matches);
+		} else {
+			hand_paper = 1;
+		}
+		sem_post(&pusher_sem);
 	}
 }
 
