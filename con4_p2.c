@@ -38,7 +38,7 @@
 //global variable(s)
 bool hand_tobacco = 0;
 bool hand_paper = 0;
-bool hand_match = 0;
+bool hand_matches = 0;
 
 //function prototype(s)
 void spawn_threads();
@@ -140,7 +140,7 @@ void* agent_thread_A()
 			ANSI_COLOR_RESET "\n");
 		hand_tobacco = 1;
 		hand_paper = 1;
-		hand_match = 0;
+		hand_matches = 0;
 		sem_post(&tobacco);
 		sem_post(&paper);
 	}
@@ -160,7 +160,7 @@ void* agent_thread_B()
 			ANSI_COLOR_RESET "\n");
 		hand_tobacco = 0;
 		hand_paper = 1;
-		hand_match = 1;
+		hand_matches = 1;
 		sem_post(&matches);
 		sem_post(&paper);
 	}
@@ -180,7 +180,7 @@ void* agent_thread_C()
 			ANSI_COLOR_RESET "\n");
 		hand_tobacco = 1;
 		hand_paper = 0;
-		hand_match = 1;
+		hand_matches = 1;
 		sem_post(&matches);
 		sem_post(&tobacco);
 	}
@@ -259,10 +259,10 @@ void* pusher_thread_A()
 		sem_wait(&pusher_sem);
 		if(hand_paper){
 			hand_paper = 0;
-			sem_post(smoker_thread_matches);
-		} else if(hand_match){
-			hand_match = 0;
-			sem_post(smoker_thread_paper);
+			sem_post(&mutex_matches);
+		} else if(hand_matches){
+			hand_matches = 0;
+			sem_post(&mutex_paper);
 		} else {
 			hand_tobacco = 1;
 		}
@@ -283,10 +283,10 @@ void* pusher_thread_B()
 		sem_wait(&pusher_sem);
 		if(hand_paper){
 			hand_paper = 0;
-			sem_post(smoker_thread_tobacco);
+			sem_post(&mutex_tobacco);
 		} else if(hand_tobacco){
 			hand_tobacco = 0;
-			sem_post(smoker_thread_paper);
+			sem_post(&mutex_paper);
 		} else {
 			hand_matches = 1;
 		}
@@ -307,10 +307,10 @@ void* pusher_thread_C()
 		sem_wait(&pusher_sem);
 		if(hand_matches){
 			hand_matches = 0;
-			sem_post(smoker_thread_tobacco);
+			sem_post(&mutex_tobacco);
 		} else if(hand_tobacco){
 			hand_tobacco = 0;
-			sem_post(smoker_thread_matches);
+			sem_post(&mutex_matches);
 		} else {
 			hand_paper = 1;
 		}
