@@ -51,7 +51,6 @@ void* agent_thread_C();
 void* pusher_thread_A();
 void* pusher_thread_B();
 void* pusher_thread_C();
-int random_range(int min_val, int max_val);
 
 //create semaphore(s)
 sem_t agent_sem;
@@ -105,7 +104,7 @@ void spawn_threads()
 {
 	pthread_t thrd;
 
-	printf(ANSI_COLOR_MAGENTA "\n There is 1 agent and 3 smokers." ANSI_COLOR_RESET "\n\n");
+	printf(ANSI_COLOR_MAGENTA "\nThere is 1 agent and 3 smokers." ANSI_COLOR_RESET "\n\n");
 	
 	//we create three smokers
 	pthread_create(&thrd, NULL, smoker_thread_matches, NULL);	
@@ -136,11 +135,8 @@ void* agent_thread_A()
 {
 	while(true){
 		sem_wait(&agent_sem);
-		printf(ANSI_COLOR_CYAN "\n The agent holds out tobacco and paper." 
+		printf(ANSI_COLOR_CYAN "The agent holds out tobacco and paper." 
 			ANSI_COLOR_RESET "\n");
-		hand_tobacco = 1;
-		hand_paper = 1;
-		hand_matches = 0;
 		sem_post(&tobacco);
 		sem_post(&paper);
 	}
@@ -156,11 +152,8 @@ void* agent_thread_B()
 {
 	while(true){
 		sem_wait(&agent_sem);
-		printf(ANSI_COLOR_CYAN "\n The agent holds out matches and paper." 
+		printf(ANSI_COLOR_CYAN "The agent holds out matches and paper." 
 			ANSI_COLOR_RESET "\n");
-		hand_tobacco = 0;
-		hand_paper = 1;
-		hand_matches = 1;
 		sem_post(&matches);
 		sem_post(&paper);
 	}
@@ -176,11 +169,8 @@ void* agent_thread_C()
 {
 	while(true){
 		sem_wait(&agent_sem);
-		printf(ANSI_COLOR_CYAN "\n The agent holds out matches and tobacco." 
+		printf(ANSI_COLOR_CYAN "The agent holds out matches and tobacco." 
 			ANSI_COLOR_RESET "\n");
-		hand_tobacco = 1;
-		hand_paper = 0;
-		hand_matches = 1;
 		sem_post(&matches);
 		sem_post(&tobacco);
 	}
@@ -196,13 +186,15 @@ void* smoker_thread_matches()
 {
 	while(true){
 		sem_wait(&mutex_matches);
-		printf(ANSI_COLOR_YELLOW "\n The smoker takes the tobacco and paper." 
+		printf(ANSI_COLOR_YELLOW "The smoker with matches takes the tobacco and paper." 
 			ANSI_COLOR_RESET "\n");
-		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+		printf(ANSI_COLOR_YELLOW "The smoker makes a cigarette." 
 			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sleep(3);
 		sem_post(&agent_sem);
-		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
-			ANSI_COLOR_RESET "\n");
+		sleep(3);
 	}
 }
 
@@ -216,13 +208,15 @@ void* smoker_thread_tobacco()
 {
 	while(true){
 		sem_wait(&mutex_tobacco);
-		printf(ANSI_COLOR_YELLOW "\n The smoker takes the matches and paper." 
+		printf(ANSI_COLOR_YELLOW "The smoker with tobacco takes the matches and paper." 
 			ANSI_COLOR_RESET "\n");
-		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+		printf(ANSI_COLOR_YELLOW "The smoker makes a cigarette." 
 			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sleep(3);
 		sem_post(&agent_sem);
-		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
-			ANSI_COLOR_RESET "\n");
+		sleep(3);
 	}
 }
 
@@ -236,13 +230,15 @@ void* smoker_thread_paper()
 {
 	while(true){
 		sem_wait(&mutex_paper);
-		printf(ANSI_COLOR_YELLOW "\n The smoker takes the matches and tobacco." 
+		printf(ANSI_COLOR_YELLOW "The smoker with paper takes the matches and tobacco." 
 			ANSI_COLOR_RESET "\n");
-		printf(ANSI_COLOR_YELLOW "\n The smoker makes a cigarette." 
+		printf(ANSI_COLOR_YELLOW "The smoker makes a cigarette." 
 			ANSI_COLOR_RESET "\n");
+		printf(ANSI_COLOR_YELLOW "The smoker smokes the cigarette." 
+			ANSI_COLOR_RESET "\n");
+		sleep(3);
 		sem_post(&agent_sem);
-		printf(ANSI_COLOR_YELLOW "\n The smoker smokes the cigarette." 
-			ANSI_COLOR_RESET "\n");
+		sleep(3);
 	}
 }
 
@@ -316,52 +312,4 @@ void* pusher_thread_C()
 		}
 		sem_post(&pusher_sem);
 	}
-}
-
-/* Function: random_range
- * ----------------------
- * This function finds a random number between a min and max value (inclusive).
- * The random value is created using rdrand x86 ASM on systems that support it,
- * and it uses Mersenne Twister on systems that do not support rdrand.
- *
- * min_val: The lowest possible random number.
- * max_val: The highest possible random number.
- *
- * returns: A random number in the given range. In the case that min_val is
- *          greater than max_val this function returns -1.
- */
-int random_range(int min_val, int max_val)
-{
-	if(min_val > max_val)
-		return -1;
-
-	int output;
-	unsigned int eax;
-	unsigned int ebx;
-	unsigned int ecx;
-	unsigned int edx;
-
-	char vendor[13];
-	
-	eax = 0x01;
-
-	__asm__ __volatile__(
-	                     "cpuid;"
-	                     : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-	                     : "a"(eax)
-	                     );
-	if(ecx & 0x40000000){
-		//use rdrand
-	__asm__ __volatile__(
-	                     "rdrand %0"
-                             : "=r"(output)
-	                     );
-	} else {
-		//use mt19937
-		output = genrand_int32();
-	}
-
-	//get random number in the range requested 
-	output = (abs(output) % (max_val + 1 - min_val)) + min_val;
-	return output;
 }
