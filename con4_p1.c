@@ -188,8 +188,6 @@ void* customer_thread()
 	while(true){
 		sleep(random_range(3, 30));
 		printf(ANSI_COLOR_YELLOW "Customer entered barbershop." ANSI_COLOR_RESET "\n");
-		//if the barber is asleep the customer wakes him up
-		sem_post(&sleeping_barber);
 		//if there are no chairs just leave
 		if(chairs_waiting == -1){
 			printf(ANSI_COLOR_YELLOW "There aren't any chairs in this barbershop. Customer left the barbershop." ANSI_COLOR_RESET "\n");
@@ -197,6 +195,8 @@ void* customer_thread()
 		}
 		//if the barber chair is empty sit in it
 		if(sem_trywait(&barber_chair) != -1){
+				//if the barber is asleep the customer wakes him up
+				sem_post(&sleeping_barber);
 				//get a haircut
 				printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
 				while(sem_trywait(&barber_tools) != -1){
@@ -214,6 +214,8 @@ void* customer_thread()
 				ANSI_COLOR_RESET "\n", customers_waiting, chairs_waiting);
 			sem_post(&waiting_chairs);
 			sem_wait(&barber_chair);
+			//if the barber is asleep the customer wakes him up
+			sem_post(&sleeping_barber);
 			//get a haircut	
 			printf(ANSI_COLOR_YELLOW "Customer sat down in the barber chair." ANSI_COLOR_RESET "\n");
 			sem_wait(&waiting_chairs);
